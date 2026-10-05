@@ -1,0 +1,27 @@
+services:
+  postgres:
+    image: postgres:16
+    container_name: neutron-controlforge-postgres
+
+    environment:
+      POSTGRES_DB: agentguard
+      POSTGRES_USER: agentguard
+      POSTGRES_PASSWORD: agentguard
+
+    ports:
+      - "5432:5432"
+
+    volumes:
+      - controlforge_postgres_data:/var/lib/postgresql/data
+
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U agentguard -d agentguard"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+volumes:
+  controlforge_postgres_data:
+    # Preserve the existing development database volume created by the
+    # previous Docker Compose project configuration.
+    name: infra_agentguard_postgres_data

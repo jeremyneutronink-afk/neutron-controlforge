@@ -1,0 +1,67 @@
+services:
+  postgres:
+    image: postgres:16
+    restart: unless-stopped
+
+    environment:
+      POSTGRES_DB: controlforge
+      POSTGRES_USER: controlforge
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?POSTGRES_PASSWORD is required}
+
+    volumes:
+      - controlforge_postgres_data:/var/lib/postgresql/data
+
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U controlforge -d controlforge"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  api:
+    build:
+      context: ..
+      dockerfile: apps/api/Dockerfile
+
+    restart: unless-stopped
+
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+    environment:
+      DATABASE_URL: postgresql://controlforge:${POSTGRES_PASSWORD}@postgres:5432/controlforge
+      AGENTGUARD_ADMIN_KEY: ${AGENTGUARD_ADMIN_KEY:?AGENTGUARD_ADMIN_KEY is required}
+      SYSTEM_TEST_BASE_URL: http://api:8000
+      ENVIRONMENT: production
+      DEBUG: "false"
+
+    ports:
+      - "${CONTROLFORGE_API_PORT:-8000}:8000"
+
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/health', timeout=3)"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 10s
+
+  dashboard:
+    build:
+      context: ..
+      dockerfile: apps/dashboard/Dockerfile
+
+    restart: unless-stopped
+
+    depends_on:
+      api:
+        condition: service_healthy
+
+    environment:
+      AGENTGUARD_API_URL: http://api:8000
+      AGENTGUARD_ADMIN_KEY: ${AGENTGUARD_ADMIN_KEY:?AGENTGUARD_ADMIN_KEY is required}
+
+    ports:
+      - "${CONTROLFORGE_DASHBOARD_PORT:-3000}:3000"
+
+volumes:
+  controlforge_postgres_data:
